@@ -19,6 +19,7 @@ import {
   Bot,
   Link,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -228,6 +229,25 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
       setEmpStatus({ type: 'error', message: err.message });
     } finally {
       setEmpLoading(false);
+    }
+  };
+
+  const handleDeleteEmployee = async (emp) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa nhân viên ${emp.name} (${emp.code}) không?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/employees/${emp.id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.message || 'Không thể xóa nhân viên');
+      }
+      if (onEmployeeAdded) onEmployeeAdded();
+      fetchDashboardData();
+    } catch (err) {
+      alert(err.message);
     }
   };
 
@@ -734,6 +754,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                   <th className="p-3">Tên Nhân Viên</th>
                   <th className="p-3">Mã Hậu Đài</th>
                   <th className="p-3">Ngày Tạo</th>
+                  <th className="p-3 text-right">Thao Tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -744,6 +765,16 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                     <td className="p-3 font-mono font-bold text-indigo-400">{emp.code}</td>
                     <td className="p-3 text-slate-400">
                       {new Date(emp.createdAt).toLocaleDateString('vi-VN')}
+                    </td>
+                    <td className="p-3 text-right">
+                      <button
+                        onClick={() => handleDeleteEmployee(emp)}
+                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 ml-auto transition-all"
+                        title="Xóa nhân viên"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Xóa</span>
+                      </button>
                     </td>
                   </tr>
                 ))}
