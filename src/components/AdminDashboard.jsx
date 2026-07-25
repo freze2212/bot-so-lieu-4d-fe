@@ -461,6 +461,19 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                 />
               </div>
 
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  Nội Dung Tin Nhắn Telegram (Sửa trực tiếp bằng tay)
+                </label>
+                <textarea
+                  rows={8}
+                  placeholder="Nhập nội dung tin nhắn Telegram..."
+                  value={teleConfig.messageText || ''}
+                  onChange={(e) => setTeleConfig({ ...teleConfig, messageText: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-900 border border-slate-800 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-xs font-mono leading-relaxed"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
@@ -529,16 +542,20 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                 <span>🤖📊 BOT BÁO CÁO HẰNG NGÀY 📊🤖</span>
               </div>
 
-              <div className="text-xs sm:text-sm leading-relaxed text-slate-200 space-y-2 whitespace-pre-line">
-                <p>Tới giờ báo cáo số liệu hôm nay rồi nha anh em ✨</p>
-                <p>Mọi người chỉ cần bấm nút bên dưới và nhập CODE cá nhân là có thể báo cáo ngay 🚀</p>
-                <p>📝 Nếu nhập sai số liệu vẫn có thể vào chỉnh sửa lại sau đó nha~</p>
-                <p className="font-bold text-amber-300">⚠️ Mọi người nhớ báo cáo đầy đủ và đúng giờ quy định.</p>
-                <p>Đúng {teleConfig.scheduleTime || '13:00'} ngày mai em sẽ tổng hợp lại danh sách các trường hợp:<br />
-                • Chưa báo cáo<br />
-                • Báo cáo thiếu<br />
-                • Báo sai số liệu</p>
-                <p>và gửi anh NICE (@N_I_C_E_838) để xử lý theo quy định của team 😈</p>
+              <div className="text-xs sm:text-sm leading-relaxed text-slate-200 whitespace-pre-wrap font-sans">
+                {teleConfig.messageText || (
+                  <>
+                    Tới giờ báo cáo số liệu hôm nay rồi nha anh em ✨<br /><br />
+                    Mọi người chỉ cần bấm nút bên dưới và nhập CODE cá nhân là có thể báo cáo ngay 🚀<br /><br />
+                    📝 Nếu nhập sai số liệu vẫn có thể vào chỉnh sửa lại sau đó nha~<br /><br />
+                    ⚠️ Mọi người nhớ báo cáo đầy đủ và đúng giờ quy định.<br /><br />
+                    Đúng {teleConfig.scheduleTime || '13:00'} ngày mai em sẽ tổng hợp lại danh sách các trường hợp:<br />
+                    • Chưa báo cáo<br />
+                    • Báo cáo thiếu<br />
+                    • Báo sai số liệu<br /><br />
+                    và gửi anh NICE (@N_I_C_E_838) để xử lý theo quy định của team 😈
+                  </>
+                )}
               </div>
 
               {/* Telegram Inline Buttons */}
