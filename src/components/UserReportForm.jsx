@@ -46,9 +46,25 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!employeeCode.trim()) {
+    const trimmedCode = employeeCode.trim().toUpperCase();
+
+    if (!trimmedCode) {
       setStatus({ type: 'error', message: 'Vui lòng chọn hoặc nhập Mã hậu đài!' });
       return;
+    }
+
+    // Validate employee code against valid employees list
+    if (employees && employees.length > 0) {
+      const foundEmp = employees.find(
+        (emp) => emp.code.toUpperCase() === trimmedCode
+      );
+      if (!foundEmp) {
+        setStatus({
+          type: 'error',
+          message: `Mã hậu đài "${trimmedCode}" không tồn tại trong hệ thống! Vui lòng kiểm tra lại.`,
+        });
+        return;
+      }
     }
 
     setLoading(true);
@@ -63,7 +79,7 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeCode: employeeCode.trim(),
+          employeeCode: trimmedCode,
           date: isoDate,
           registeredCount: Number(formData.registeredCount) || 0,
           firstDepositCount: Number(formData.firstDepositCount) || 0,
@@ -92,12 +108,37 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
       });
 
       if (onReportSubmitted) {
-        onReportSubmitted();
+        onReportSubmitted(trimmedCode);
       }
     } catch (err) {
       setStatus({ type: 'error', message: err.message || 'Không thể kết nối đến hệ thống server!' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleOnlyViewDashboard = () => {
+    const trimmedCode = employeeCode.trim().toUpperCase();
+    if (!trimmedCode) {
+      setStatus({ type: 'error', message: 'Vui lòng chọn hoặc nhập Mã hậu đài!' });
+      return;
+    }
+
+    if (employees && employees.length > 0) {
+      const foundEmp = employees.find(
+        (emp) => emp.code.toUpperCase() === trimmedCode
+      );
+      if (!foundEmp) {
+        setStatus({
+          type: 'error',
+          message: `Mã hậu đài "${trimmedCode}" không tồn tại trong hệ thống! Vui lòng kiểm tra lại.`,
+        });
+        return;
+      }
+    }
+
+    if (onReportSubmitted) {
+      onReportSubmitted(trimmedCode);
     }
   };
 
@@ -257,11 +298,11 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
           </div>
 
           {/* Submit Button */}
-          <div className="pt-2">
+          <div className="pt-2 space-y-2.5">
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 via-brand-500 to-indigo-600 text-white font-bold text-lg rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full py-4 px-6 bg-gradient-to-r from-indigo-600 via-indigo-500 to-indigo-600 text-white font-bold text-lg rounded-xl shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40 hover:opacity-95 active:scale-[0.99] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <>
@@ -271,6 +312,14 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
               ) : (
                 <span>Gửi báo cáo</span>
               )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleOnlyViewDashboard}
+              className="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5"
+            >
+              <span>Vào trang số liệu cá nhân (Không gửi báo cáo)</span>
             </button>
           </div>
         </form>

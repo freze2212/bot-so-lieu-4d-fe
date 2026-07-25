@@ -25,9 +25,10 @@ import UserReportForm from './UserReportForm';
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 export default function UserOverviewDashboard({ employees = [] }) {
-  const [selectedEmployeeCode, setSelectedEmployeeCode] = useState('GG88F4D04');
+  const [selectedEmployeeCode, setSelectedEmployeeCode] = useState(() => localStorage.getItem('authorizedEmpCode') || 'GG88F4D04');
   const [granularity, setGranularity] = useState('day');
-  const [showReportModal, setShowReportModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(() => Boolean(localStorage.getItem('authorizedEmpCode')));
 
   const [statsData, setStatsData] = useState({
     summary: {
@@ -483,22 +484,28 @@ export default function UserOverviewDashboard({ employees = [] }) {
 
       </main>
 
-      {/* Report Popup Modal (Exact match to Image 2) */}
+      {/* Report Popup Modal */}
       {showReportModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in-0 duration-200">
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 overflow-y-auto animate-in fade-in-0 duration-200">
           <div className="relative w-full max-w-md my-8">
-            <button
-              onClick={() => setShowReportModal(false)}
-              className="absolute -top-3 -right-3 w-9 h-9 bg-slate-800 text-slate-300 hover:text-white rounded-full shadow-lg flex items-center justify-center font-bold text-lg z-50 border border-slate-700"
-            >
-              ✕
-            </button>
+            {isAuthorized && (
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="absolute -top-3 -right-3 w-9 h-9 bg-slate-800 text-slate-300 hover:text-white rounded-full shadow-lg flex items-center justify-center font-bold text-lg z-50 border border-slate-700"
+              >
+                ✕
+              </button>
+            )}
 
             <UserReportForm
               employees={employees}
-              onReportSubmitted={() => {
+              onReportSubmitted={(validCode) => {
+                const codeToUse = validCode || selectedEmployeeCode;
+                localStorage.setItem('authorizedEmpCode', codeToUse);
+                setSelectedEmployeeCode(codeToUse);
+                setIsAuthorized(true);
                 fetchStats();
-                setTimeout(() => setShowReportModal(false), 1500);
+                setTimeout(() => setShowReportModal(false), 500);
               }}
             />
           </div>
