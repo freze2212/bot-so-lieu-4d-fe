@@ -39,7 +39,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
   const [token, setToken] = useState(() => localStorage.getItem('adminToken') || '');
   const [activeTab, setActiveTab] = useState('stats'); // 'stats' | 'employees' | 'reports' | 'telegram'
 
-  const [loginForm, setLoginForm] = useState({ username: 'admin', password: 'admin123' });
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
 
@@ -297,9 +297,6 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-xs text-slate-500">
-            Tài khoản mặc định: <span className="font-mono text-slate-300 font-bold">admin</span> / <span className="font-mono text-slate-300 font-bold">admin123</span>
-          </div>
         </div>
       </div>
     );
