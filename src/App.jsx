@@ -3,7 +3,7 @@ import UserOverviewDashboard from './components/UserOverviewDashboard';
 import AdminDashboard from './components/AdminDashboard';
 import { User, ShieldCheck } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 export default function App() {
   const [viewMode, setViewMode] = useState('user'); // 'user' | 'admin'

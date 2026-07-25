@@ -22,7 +22,7 @@ import {
 } from 'recharts';
 import UserReportForm from './UserReportForm';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 export default function UserOverviewDashboard({ employees = [] }) {
   const [selectedEmployeeCode, setSelectedEmployeeCode] = useState('GG88F4D04');
