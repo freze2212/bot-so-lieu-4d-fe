@@ -711,6 +711,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                     <th className="p-3 text-center">Khách Nạp Đầu</th>
                     <th className="p-3 text-right">Tổng Nạp</th>
                     <th className="p-3 text-right">Tổng Cược</th>
+                    <th className="p-3 text-right">Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
@@ -723,6 +724,16 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       <td className="p-3 text-center font-semibold text-emerald-400">{emp.firstDeposit}</td>
                       <td className="p-3 text-right font-bold text-amber-400">{formatVND(emp.totalDeposit)}</td>
                       <td className="p-3 text-right font-bold text-purple-400">{formatVND(emp.totalBet)}</td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteEmployee({ id: emp.employeeCode, code: emp.employeeCode, name: emp.employeeName })}
+                          className="px-2.5 py-1 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1 ml-auto transition-all"
+                          title="Xóa nhân viên & toàn bộ số liệu thống kê"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Xóa</span>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
