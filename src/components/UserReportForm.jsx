@@ -4,9 +4,8 @@ import { CheckCircle2, AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
 
 export default function UserReportForm({ employees = [], onReportSubmitted }) {
-  const [employeeCode, setEmployeeCode] = useState('GG88F4D04');
-  const [employeeName, setEmployeeName] = useState('GHE BIFRONS');
-  const [isCustomCode, setIsCustomCode] = useState(false);
+  const [employeeCode, setEmployeeCode] = useState('');
+  const [employeeName, setEmployeeName] = useState('---');
 
   const [date, setDate] = useState(() => {
     const today = new Date();
@@ -25,17 +24,19 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
 
   // Update employee name when code changes
   useEffect(() => {
+    if (!employeeCode.trim()) {
+      setEmployeeName('---');
+      return;
+    }
     const emp = employees.find(
-      (e) => e.code.toLowerCase() === employeeCode.toLowerCase()
+      (e) => e.code.trim().toLowerCase() === employeeCode.trim().toLowerCase()
     );
     if (emp) {
       setEmployeeName(emp.name);
-    } else if (!isCustomCode && employees.length > 0) {
-      // default first employee
-      setEmployeeCode(employees[0].code);
-      setEmployeeName(employees[0].name);
+    } else {
+      setEmployeeName('--- (Mã không hợp lệ)');
     }
-  }, [employeeCode, employees, isCustomCode]);
+  }, [employeeCode, employees]);
 
   const handleInputChange = (field, value) => {
     setFormData((prev) => ({
@@ -169,51 +170,15 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
             <span className="font-bold text-slate-900 uppercase">{employeeName}</span>
           </div>
 
-          <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
-            <span className="text-slate-500">Mã hậu đài:</span>
-            <div className="flex items-center gap-2">
-              {!isCustomCode && employees.length > 0 ? (
-                <select
-                  value={employeeCode}
-                  onChange={(e) => {
-                    if (e.target.value === 'NEW') {
-                      setIsCustomCode(true);
-                      setEmployeeCode('');
-                      setEmployeeName('NHÂN VIÊN MỚI');
-                    } else {
-                      setEmployeeCode(e.target.value);
-                    }
-                  }}
-                  className="font-bold text-slate-900 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs focus:ring-2 focus:ring-brand-500 outline-none"
-                >
-                  {employees.map((emp) => (
-                    <option key={emp.id} value={emp.code}>
-                      {emp.code} ({emp.name})
-                    </option>
-                  ))}
-                  <option value="NEW">+ Nhập mã khác...</option>
-                </select>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <input
-                    type="text"
-                    placeholder="Mã hậu đài"
-                    value={employeeCode}
-                    onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
-                    className="font-bold text-slate-900 bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs outline-none w-28 uppercase"
-                  />
-                  {employees.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomCode(false)}
-                      className="text-xs text-brand-600 underline font-medium hover:text-brand-800"
-                    >
-                      Danh sách
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+          <div className="flex justify-between items-center pt-2 border-t border-slate-200/60">
+            <span className="text-slate-500 font-semibold">Mã hậu đài:</span>
+            <input
+              type="text"
+              placeholder="Nhập mã hậu đài..."
+              value={employeeCode}
+              onChange={(e) => setEmployeeCode(e.target.value.toUpperCase())}
+              className="font-mono font-bold text-indigo-600 bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl px-3 py-1.5 text-xs outline-none w-48 uppercase text-right"
+            />
           </div>
         </div>
 
