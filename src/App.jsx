@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import UserOverviewDashboard from './components/UserOverviewDashboard';
 import AdminDashboard from './components/AdminDashboard';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 export default function App() {
   // Determine view mode from URL path (/admin) or URL query parameter (?mode=admin)
@@ -47,7 +47,7 @@ export default function App() {
 
       {/* Footer */}
       <footer className="py-4 text-center text-xs text-slate-500 border-t border-slate-800/80 bg-[#070a12]">
-        BÁO CÁO 4D ONLINE • Hệ Thống Thống Kê Số Liệu Cá Nhân
+        BÁO CÁO ONLINE • Hệ Thống Thống Kê Số Liệu Cá Nhân
       </footer>
     </div>
   );

@@ -1,20 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { CheckCircle2, AlertCircle, RefreshCw, UserCheck } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 export default function UserReportForm({ employees = [], onReportSubmitted }) {
   const [employeeCode, setEmployeeCode] = useState('');
   const [employeeName, setEmployeeName] = useState('---');
 
-  const [date, setDate] = useState(() => {
-    const today = new Date();
-    return `${today.getDate()}/${today.getMonth() + 1}/${today.getFullYear()}`;
-  });
+  const getTodayIsoDate = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [reportDate, setReportDate] = useState(getTodayIsoDate);
 
   const [formData, setFormData] = useState({
     registeredCount: '',
     firstDepositCount: '',
+    depositorsCount: '',
     totalDeposit: '',
     totalBet: '',
   });
@@ -38,10 +44,26 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
     }
   }, [employeeCode, employees]);
 
+  const parseRawNumber = (val) => {
+    if (!val) return 0;
+    const digitsOnly = String(val).replace(/\D/g, '');
+    return Number(digitsOnly) || 0;
+  };
+
   const handleInputChange = (field, value) => {
+    if (!value) {
+      setFormData((prev) => ({ ...prev, [field]: '' }));
+      return;
+    }
+    const digitsOnly = String(value).replace(/\D/g, '');
+    if (!digitsOnly) {
+      setFormData((prev) => ({ ...prev, [field]: '' }));
+      return;
+    }
+    const formatted = Number(digitsOnly).toLocaleString('en-US');
     setFormData((prev) => ({
       ...prev,
-      [field]: value,
+      [field]: formatted,
     }));
   };
 
@@ -72,24 +94,25 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
     setStatus({ type: '', message: '' });
 
     try {
-      // Format date for API (YYYY-MM-DD)
-      const now = new Date();
-      const isoDate = now.toISOString().split('T')[0];
+      const selectedDate = reportDate || getTodayIsoDate();
 
       const res = await fetch(`${API_BASE}/reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           employeeCode: trimmedCode,
-          date: isoDate,
-          registeredCount: Number(formData.registeredCount) || 0,
-          firstDepositCount: Number(formData.firstDepositCount) || 0,
-          totalDeposit: Number(formData.totalDeposit) || 0,
-          totalBet: Number(formData.totalBet) || 0,
+          date: selectedDate,
+          registeredCount: parseRawNumber(formData.registeredCount),
+          firstDepositCount: parseRawNumber(formData.firstDepositCount),
+          depositorsCount: parseRawNumber(formData.depositorsCount),
+          totalDeposit: parseRawNumber(formData.totalDeposit),
+          totalBet: parseRawNumber(formData.totalBet),
         }),
       });
 
-      const data = await res.json();
+      const text = await res.text();
+      let data = {};
+      try { data = text ? JSON.parse(text) : {}; } catch (e) {}
 
       if (!res.ok) {
         throw new Error(data.message || 'Lỗi gửi báo cáo!');
@@ -104,6 +127,7 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
       setFormData({
         registeredCount: '',
         firstDepositCount: '',
+        depositorsCount: '',
         totalDeposit: '',
         totalBet: '',
       });
@@ -161,8 +185,13 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
         {/* Info Box */}
         <div className="bg-[#f0f4fb] rounded-2xl p-4 mb-6 text-sm text-slate-700 space-y-2 border border-slate-200/50">
           <div className="flex justify-between items-center">
-            <span className="text-slate-500">Ngày/tháng:</span>
-            <span className="font-bold text-slate-900">{date}</span>
+            <span className="text-slate-500 font-semibold">Ngày/tháng báo cáo:</span>
+            <input
+              type="date"
+              value={reportDate}
+              onChange={(e) => setReportDate(e.target.value)}
+              className="font-bold text-slate-900 bg-white border border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 rounded-xl px-3 py-1.5 text-xs outline-none cursor-pointer shadow-sm"
+            />
           </div>
 
           <div className="flex justify-between items-center">
@@ -201,64 +230,79 @@ export default function UserReportForm({ employees = [], onReportSubmitted }) {
         )}
 
         {/* Form Inputs */}
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           {/* Field 1: Số khách đăng ký */}
           <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
               Số khách đăng kí
             </label>
             <input
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="0"
               value={formData.registeredCount}
               onChange={(e) => handleInputChange('registeredCount', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 text-base focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-semibold"
             />
           </div>
 
           {/* Field 2: Số khách nạp đầu */}
           <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">
-              Số khách nạp đầu
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Số khách nạp đầu (Khách mới)
             </label>
             <input
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="0"
               value={formData.firstDepositCount}
               onChange={(e) => handleInputChange('firstDepositCount', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 text-base focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-semibold"
             />
           </div>
 
-          {/* Field 3: Tổng Nạp / Ngày */}
+          {/* Field 3: Số lượng người nạp tiền */}
           <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">
-              Tổng Nạp / Ngày
+            <label className="block text-xs font-bold text-indigo-600 uppercase mb-1">
+              Số lượng người nạp tiền (Trong ngày)
             </label>
             <input
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
+              placeholder="0"
+              value={formData.depositorsCount}
+              onChange={(e) => handleInputChange('depositorsCount', e.target.value)}
+              className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/20 text-slate-800 text-sm font-semibold focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-semibold"
+            />
+          </div>
+
+          {/* Field 4: Tổng Nạp / Ngày */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Tổng Nạp / Ngày (VND)
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
               placeholder="0"
               value={formData.totalDeposit}
               onChange={(e) => handleInputChange('totalDeposit', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 text-base focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-semibold"
             />
           </div>
 
-          {/* Field 4: Tổng Cược / Ngày */}
+          {/* Field 5: Tổng Cược / Ngày */}
           <div>
-            <label className="block text-sm font-bold text-slate-800 mb-1.5">
-              Tổng Cược / Ngày
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+              Tổng Cược / Ngày (VND)
             </label>
             <input
-              type="number"
-              min="0"
+              type="text"
+              inputMode="numeric"
               placeholder="0"
               value={formData.totalBet}
               onChange={(e) => handleInputChange('totalBet', e.target.value)}
-              className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-800 text-base focus:border-brand-500 focus:ring-4 focus:ring-brand-100 outline-none transition-all"
+              className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-800 text-sm focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all font-semibold"
             />
           </div>
 

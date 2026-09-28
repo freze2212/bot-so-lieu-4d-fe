@@ -22,14 +22,15 @@ import {
 } from 'recharts';
 import UserReportForm from './UserReportForm';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_BASE || '/api';
 
 export default function UserOverviewDashboard({ employees = [] }) {
-  const [selectedEmployeeCode, setSelectedEmployeeCode] = useState(() => localStorage.getItem('authorizedEmpCode') || 'GG88F4D04');
+  const [selectedEmployeeCode, setSelectedEmployeeCode] = useState(() => localStorage.getItem('authorizedEmpCode') || '');
   const [granularity, setGranularity] = useState('day');
   const [showReportModal, setShowReportModal] = useState(true);
   const [isAuthorized, setIsAuthorized] = useState(() => Boolean(localStorage.getItem('authorizedEmpCode')));
 
+  const [allReports, setAllReports] = useState([]);
   const [statsData, setStatsData] = useState({
     summary: {
       totalRegistered: 0,
@@ -51,10 +52,18 @@ export default function UserOverviewDashboard({ employees = [] }) {
   const fetchStats = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/reports/stats`);
-      if (res.ok) {
-        const data = await res.json();
+      const [resStats, resReports] = await Promise.all([
+        fetch(`${API_BASE}/reports/stats?employeeCode=${encodeURIComponent(selectedEmployeeCode)}`),
+        fetch(`${API_BASE}/reports`),
+      ]);
+
+      if (resStats.ok) {
+        const data = await resStats.json();
         setStatsData(data);
+      }
+      if (resReports.ok) {
+        const rData = await resReports.json();
+        setAllReports(Array.isArray(rData) ? rData : []);
       }
     } catch (err) {
       console.error('Lỗi tải thống kê user:', err);
@@ -65,62 +74,117 @@ export default function UserOverviewDashboard({ employees = [] }) {
 
   const currentEmp = employees.find(
     (e) => e.code.toLowerCase() === selectedEmployeeCode.toLowerCase()
-  ) || { name: 'GHE BIFRONS', code: 'GG88F4D04' };
+  ) || { name: '', code: selectedEmployeeCode || '' };
 
-  const empStat = statsData.employeeStats.find(
-    (s) => s.employeeCode.toLowerCase() === selectedEmployeeCode.toLowerCase()
-  ) || {
-    registered: 58,
-    firstDeposit: 33,
-    totalDeposit: 71000000,
-    totalBet: 197000000,
-    reportCount: 3,
+  // Strict matching set for selected employee
+  const matchingCodes = new Set([
+    selectedEmployeeCode.trim().toLowerCase(),
+    (currentEmp.code || '').trim().toLowerCase(),
+    (currentEmp.name || '').trim().toLowerCase(),
+  ].filter(Boolean));
+
+  // Filter raw reports strictly for current employee
+  const employeeReports = allReports.filter((r) => {
+    const empCode = (r.employeeCode || '').trim().toLowerCase();
+    const empName = (r.employeeName || '').trim().toLowerCase();
+    return matchingCodes.has(empCode) || matchingCodes.has(empName);
+  });
+
+  // KPI & Summary calculation for selected employee
+  const empStat = {
+    registered: employeeReports.length > 0
+      ? employeeReports.reduce((sum, r) => sum + (Number(r.registeredCount) || 0), 0)
+      : (statsData.summary?.totalRegistered || 0),
+    firstDeposit: employeeReports.length > 0
+      ? employeeReports.reduce((sum, r) => sum + (Number(r.firstDepositCount) || 0), 0)
+      : (statsData.summary?.totalFirstDeposit || 0),
+    depositors: employeeReports.length > 0
+      ? employeeReports.reduce((sum, r) => sum + (Number(r.depositorsCount) || 0), 0)
+      : (statsData.summary?.totalDepositors || 0),
+    totalDeposit: employeeReports.length > 0
+      ? employeeReports.reduce((sum, r) => sum + (Number(r.totalDeposit) || 0), 0)
+      : (statsData.summary?.grandTotalDeposit || 0),
+    totalBet: employeeReports.length > 0
+      ? employeeReports.reduce((sum, r) => sum + (Number(r.totalBet) || 0), 0)
+      : (statsData.summary?.grandTotalBet || 0),
+    turnoverRatio: 0,
+    reportCount: employeeReports.length > 0 ? employeeReports.length : (statsData.summary?.totalReports || 0),
   };
+  empStat.turnoverRatio = empStat.totalDeposit > 0
+    ? Math.round(empStat.totalBet / empStat.totalDeposit)
+    : 0;
+
+  // Build per-day aggregated map for this employee
+  const empDailyMap = new Map();
+  employeeReports.forEach((r) => {
+    const dateKey = r.date;
+    if (!empDailyMap.has(dateKey)) {
+      empDailyMap.set(dateKey, {
+        registered: 0,
+        firstDeposit: 0,
+        depositors: 0,
+        totalDeposit: 0,
+        totalBet: 0,
+      });
+    }
+    const cur = empDailyMap.get(dateKey);
+    cur.registered += Number(r.registeredCount) || 0;
+    cur.firstDeposit += Number(r.firstDepositCount) || 0;
+    cur.depositors += Number(r.depositorsCount) || 0;
+    cur.totalDeposit += Number(r.totalDeposit) || 0;
+    cur.totalBet += Number(r.totalBet) || 0;
+  });
 
   const formatVND = (num) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
   };
 
-  // Prepare chart data with exact date formatting (DD/MM) & smooth curve padding
+  // Prepare chart data with exact date formatting (DD/MM) & chronological sorting
   const generateExactChartData = () => {
-    // Generate dates: 15/07 to 23/07
-    const defaultDates = [
-      { dateFormatted: '15/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '16/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '17/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '18/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '19/07', registered: 1, firstDeposit: 1, totalDeposit: 2500, totalBet: 26000 },
-      { dateFormatted: '20/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '21/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '22/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '23/07', registered: 0, firstDeposit: 0, totalDeposit: 0, totalBet: 0 },
-      { dateFormatted: '24/07', registered: 37, firstDeposit: 20, totalDeposit: 43000, totalBet: 13000 },
-      { dateFormatted: '25/07', registered: 43, firstDeposit: 25, totalDeposit: 56000, totalBet: 152000 },
-    ];
+    const dateMap = new Map();
 
-    if (!statsData.dailyStats || statsData.dailyStats.length === 0) {
-      return defaultDates;
+    // Overlay filtered employee daily data
+    if (empDailyMap.size > 0) {
+      empDailyMap.forEach((val, dateKey) => {
+        if (!dateKey) return;
+        dateMap.set(dateKey, {
+          dateKey,
+          registered: val.registered || 0,
+          firstDeposit: val.firstDeposit || 0,
+          totalDeposit: val.totalDeposit || 0,
+          totalBet: val.totalBet || 0,
+        });
+      });
+    } else if (statsData.dailyStats && statsData.dailyStats.length > 0) {
+      statsData.dailyStats.forEach((item) => {
+        const itemCode = (item.employeeCode || '').trim().toLowerCase();
+        if ((!itemCode || matchingCodes.has(itemCode)) && item.date) {
+          dateMap.set(item.date, {
+            dateKey: item.date,
+            registered: item.registered || 0,
+            firstDeposit: item.firstDeposit || 0,
+            totalDeposit: item.totalDeposit || 0,
+            totalBet: item.totalBet || 0,
+          });
+        }
+      });
     }
 
-    // Map backend daily stats to dateFormatted
-    const backendData = statsData.dailyStats.map((item) => {
-      const parts = item.date.split('-');
-      const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.date;
+    // Sort chronologically by ISO date YYYY-MM-DD
+    const sortedList = Array.from(dateMap.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+
+    return sortedList.map((item) => {
+      const parts = item.dateKey.split('-');
+      const formatted = parts.length === 3 ? `${parts[2]}/${parts[1]}` : item.dateKey;
       return {
         dateFormatted: formatted,
-        registered: item.registered || 0,
-        firstDeposit: item.firstDeposit || 0,
+        dateKey: item.dateKey,
+        registered: item.registered,
+        firstDeposit: item.firstDeposit,
         totalDeposit: Math.round((item.totalDeposit || 0) / 1000), // convert to K
         totalBet: Math.round((item.totalBet || 0) / 1000), // convert to K
       };
     });
-
-    // Merge default date padding with backend data
-    const map = new Map();
-    defaultDates.forEach((d) => map.set(d.dateFormatted, d));
-    backendData.forEach((d) => map.set(d.dateFormatted, d));
-
-    return Array.from(map.values());
   };
 
   const chartData = generateExactChartData();
@@ -134,11 +198,11 @@ export default function UserOverviewDashboard({ employees = [] }) {
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2.5">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 text-white flex items-center justify-center font-black text-lg shadow-lg shadow-indigo-500/25">
-                4D
+                📊
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-tight flex items-center gap-2">
-                  <span>BÁO CÁO 4D</span>
+                  <span>BÁO CÁO</span>
                   <span className="text-xs font-semibold text-slate-400 font-mono">v1.2.0</span>
                 </h1>
                 <p className="text-xs text-slate-400">Trang Tổng Quan Cá Nhân & Số Liệu</p>
@@ -158,7 +222,7 @@ export default function UserOverviewDashboard({ employees = [] }) {
                     {emp.name} ({emp.code})
                   </option>
                 ))}
-                {employees.length === 0 && <option value="GG88F4D04" className="bg-slate-900 text-white">GHE BIFRONS (GG88F4D04)</option>}
+                {employees.length === 0 && <option value="" className="bg-slate-900 text-white">Chưa có nhân viên</option>}
               </select>
             </div>
           </div>
@@ -208,69 +272,83 @@ export default function UserOverviewDashboard({ employees = [] }) {
       {/* Main Body Dashboard Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
-        {/* 4 KPI Metric Cards Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-6">
+        {/* 6 KPI Metric Cards Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
           {/* Card 1: Đăng Ký */}
-          <div className="bg-[#0b0f19] rounded-2xl p-5 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Đăng Ký</span>
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
-                <Users className="w-5 h-5" />
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Đăng Ký</span>
+              <div className="w-8 h-8 rounded-xl bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                <Users className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-3xl font-black text-white">{empStat.registered}</h3>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" /> +12%
-              </span>
+              <h3 className="text-2xl font-black text-white">{empStat.registered}</h3>
             </div>
           </div>
 
           {/* Card 2: Nạp Lần Đầu */}
-          <div className="bg-[#0b0f19] rounded-2xl p-5 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Nạp Lần Đầu</span>
-              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                <UserCheck className="w-5 h-5" />
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nạp Lần Đầu</span>
+              <div className="w-8 h-8 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                <UserCheck className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-3xl font-black text-white">{empStat.firstDeposit}</h3>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" /> +8%
-              </span>
+              <h3 className="text-2xl font-black text-white">{empStat.firstDeposit}</h3>
             </div>
           </div>
 
-          {/* Card 3: Tổng Nạp */}
-          <div className="bg-[#0b0f19] rounded-2xl p-5 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Nạp</span>
-              <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                <DollarSign className="w-5 h-5" />
+          {/* Card 3: Số Người Nạp */}
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Số Người Nạp</span>
+              <div className="w-8 h-8 rounded-xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center">
+                <TrendingUp className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-black text-amber-400">{formatVND(empStat.totalDeposit)}</h3>
-              <span className="text-xs font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" /> +15%
-              </span>
+              <h3 className="text-2xl font-black text-cyan-400">{empStat.depositors}</h3>
             </div>
           </div>
 
-          {/* Card 4: Tổng Cược */}
-          <div className="bg-[#0b0f19] rounded-2xl p-5 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
-            <div className="flex justify-between items-start mb-3">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Tổng Cược</span>
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
-                <CreditCard className="w-5 h-5" />
+          {/* Card 4: Tổng Nạp */}
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Nạp</span>
+              <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                <DollarSign className="w-4 h-4" />
               </div>
             </div>
             <div className="flex items-baseline justify-between">
-              <h3 className="text-2xl font-black text-purple-400">{formatVND(empStat.totalBet)}</h3>
-              <span className="text-xs font-semibold text-purple-400 bg-purple-500/10 px-2 py-0.5 rounded-full flex items-center gap-0.5">
-                <ArrowUpRight className="w-3 h-3" /> +20%
-              </span>
+              <h3 className="text-lg font-black text-amber-400">{formatVND(empStat.totalDeposit)}</h3>
+            </div>
+          </div>
+
+          {/* Card 5: Tổng Cược */}
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Cược</span>
+              <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">
+                <CreditCard className="w-4 h-4" />
+              </div>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-lg font-black text-purple-400">{formatVND(empStat.totalBet)}</h3>
+            </div>
+          </div>
+
+          {/* Card 6: Vòng Cược */}
+          <div className="bg-[#0b0f19] rounded-2xl p-4 border border-slate-800/80 shadow-md hover:border-slate-700 transition-all">
+            <div className="flex justify-between items-start mb-2">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Vòng Cược</span>
+              <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-400 flex items-center justify-center font-bold text-xs">
+                x
+              </div>
+            </div>
+            <div className="flex items-baseline justify-between">
+              <h3 className="text-2xl font-black text-indigo-400">{empStat.turnoverRatio} vòng</h3>
             </div>
           </div>
         </div>
@@ -463,8 +541,10 @@ export default function UserOverviewDashboard({ employees = [] }) {
                   <th className="p-3 text-center">Số Lượt Báo Cáo</th>
                   <th className="p-3 text-center">Đăng Ký</th>
                   <th className="p-3 text-center">Nạp Lần Đầu</th>
+                  <th className="p-3 text-center">Số Người Nạp</th>
                   <th className="p-3 text-right">Tổng Nạp</th>
                   <th className="p-3 text-right">Tổng Cược</th>
+                  <th className="p-3 text-center">Vòng Cược</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60">
@@ -474,8 +554,10 @@ export default function UserOverviewDashboard({ employees = [] }) {
                   <td className="p-3 text-center font-bold text-slate-300">{empStat.reportCount}</td>
                   <td className="p-3 text-center font-bold text-blue-400">{empStat.registered}</td>
                   <td className="p-3 text-center font-bold text-emerald-400">{empStat.firstDeposit}</td>
+                  <td className="p-3 text-center font-bold text-cyan-400">{empStat.depositors}</td>
                   <td className="p-3 text-right font-bold text-amber-400">{formatVND(empStat.totalDeposit)}</td>
                   <td className="p-3 text-right font-bold text-purple-400">{formatVND(empStat.totalBet)}</td>
+                  <td className="p-3 text-center font-bold text-indigo-400">{empStat.turnoverRatio} vòng</td>
                 </tr>
               </tbody>
             </table>
