@@ -92,7 +92,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
     botToken: '',
     chatId: '',
     scheduleTime: '13:00',
-    feUrl: 'https://baocao4d.online',
+    feUrl: 'https://baocaosolieu.com',
     enabled: true,
     messageText: '',
     unreportedEnabled: true,
