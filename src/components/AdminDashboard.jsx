@@ -127,6 +127,23 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
     }
   }, [token]);
 
+  useEffect(() => {
+    if (!token) return undefined;
+    const refresh = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchDashboardData();
+      fetchUnreportedStatus();
+    };
+    const timer = setInterval(refresh, 60000);
+    window.addEventListener('focus', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [token]);
+
   const fetchDashboardData = async () => {
     setLoadingData(true);
     try {
@@ -397,6 +414,14 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
   };
 
+  const formatAxisVND = (val) => {
+    const n = Number(val) || 0;
+    const fmt = (x) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 9 }).format(x);
+    if (Math.abs(n) >= 1e9) return `${fmt(n / 1e9)} Tỷ`;
+    if (Math.abs(n) >= 1e6) return `${fmt(n / 1e6)} Tr`;
+    return fmt(n);
+  };
+
   // Active selected employee details
   const activeAdminEmp = employees.find(
     (e) => e.code.toLowerCase() === selectedAdminEmpCode.toLowerCase()
@@ -490,8 +515,8 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
         dateKey: item.dateKey,
         registered: item.registered,
         firstDeposit: item.firstDeposit,
-        totalDepositK: Math.round(item.totalDeposit / 1000),
-        totalBetK: Math.round(item.totalBet / 1000),
+        totalDeposit: item.totalDeposit,
+        totalBet: item.totalBet,
       };
     });
   };
@@ -1107,7 +1132,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
 
               <div className="h-72 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <defs>
                       <linearGradient id="adminGlowDeposit" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.5}/>
@@ -1120,10 +1145,13 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
                     <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
-                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(val) => `${val}K`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }} />
-                    <Area type="monotone" dataKey="totalBetK" name="Tổng cược" stroke="#c084fc" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowBet)" />
-                    <Area type="monotone" dataKey="totalDepositK" name="Tổng nạp" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowDeposit)" />
+                    <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={70} tickFormatter={formatAxisVND} />
+                    <Tooltip
+                      contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
+                      formatter={(val, name) => [formatVND(val), name]}
+                    />
+                    <Area type="monotone" dataKey="totalBet" name="Tổng cược" stroke="#c084fc" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowBet)" />
+                    <Area type="monotone" dataKey="totalDeposit" name="Tổng nạp" stroke="#f59e0b" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowDeposit)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

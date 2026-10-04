@@ -139,6 +139,14 @@ export default function UserOverviewDashboard({ employees = [] }) {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num || 0);
   };
 
+  const formatAxisVND = (val) => {
+    const n = Number(val) || 0;
+    const fmt = (x) => new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 9 }).format(x);
+    if (Math.abs(n) >= 1e9) return `${fmt(n / 1e9)} Tỷ`;
+    if (Math.abs(n) >= 1e6) return `${fmt(n / 1e6)} Tr`;
+    return fmt(n);
+  };
+
   // Prepare chart data with exact date formatting (DD/MM) & chronological sorting
   const generateExactChartData = () => {
     const dateMap = new Map();
@@ -181,8 +189,8 @@ export default function UserOverviewDashboard({ employees = [] }) {
         dateKey: item.dateKey,
         registered: item.registered,
         firstDeposit: item.firstDeposit,
-        totalDeposit: Math.round((item.totalDeposit || 0) / 1000), // convert to K
-        totalBet: Math.round((item.totalBet || 0) / 1000), // convert to K
+        totalDeposit: item.totalDeposit || 0,
+        totalBet: item.totalBet || 0,
       };
     });
   };
@@ -380,7 +388,7 @@ export default function UserOverviewDashboard({ employees = [] }) {
             {/* Recharts Area Chart with Gradient Glowing Curves */}
             <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="glowDeposit" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.5}/>
@@ -407,12 +415,13 @@ export default function UserOverviewDashboard({ employees = [] }) {
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
-                    tickFormatter={(val) => (val >= 1000 ? `${Math.round(val / 1000)}K` : val)}
+                    width={70}
+                    tickFormatter={formatAxisVND}
                   />
 
                   <Tooltip
                     contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
-                    formatter={(val) => [`${val}K`, '']}
+                    formatter={(val, name) => [formatVND(val), name]}
                   />
 
                   <Area
