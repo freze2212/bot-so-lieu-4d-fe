@@ -408,6 +408,7 @@ export default function UserOverviewDashboard({ employees = [] }) {
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
+                    interval={chartData.length > 15 ? 'preserveStartEnd' : 0}
                   />
 
                   <YAxis
@@ -492,6 +493,7 @@ export default function UserOverviewDashboard({ employees = [] }) {
                     fontSize={11}
                     tickLine={false}
                     axisLine={false}
+                    interval={chartData.length > 15 ? 'preserveStartEnd' : 0}
                   />
 
                   <YAxis

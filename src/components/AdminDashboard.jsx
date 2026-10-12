@@ -250,7 +250,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
 
       setTeleStatus({
         type: 'success',
-        message: `🚀 Đã gửi tin nhắn nhắc nhở nhân viên chưa báo cáo vào ${data.count} nhóm! (Còn ${data.missingCount} nhân viên chưa báo cáo hôm nay)`,
+        message: `🚀 Đã gửi tin nhắn nhắc nhở nhân viên chưa báo cáo vào ${data.count} nhóm! (Còn ${data.missingCount} nhân viên chưa báo cáo ngày ${unreportedStatus.todayFormatted || 'hôm qua'})`,
       });
       fetchUnreportedStatus();
     } catch (err) {
@@ -848,7 +848,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                   </div>
                   <div className="flex items-center">
                     <span className="text-xs text-slate-400 bg-slate-800 px-3 py-2 rounded-xl w-full">
-                      Chưa báo cáo hôm nay: <b className="text-amber-400">{unreportedStatus.missingEmployees?.length || 0}</b> / {unreportedStatus.totalEmployeesCount || employees.length} nhân viên
+                      Chưa báo cáo ngày {unreportedStatus.todayFormatted || 'hôm qua'}: <b className="text-amber-400">{unreportedStatus.missingEmployees?.length || 0}</b> / {unreportedStatus.totalEmployeesCount || employees.length} nhân viên
                     </span>
                   </div>
                 </div>
@@ -962,7 +962,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                   )
                 ) : (
                   (() => {
-                    const template = teleConfig.unreportedMessageText || `⚠️ DANH SÁCH NHÂN VIÊN CHƯA BÁO CÁO HÔM NAY ({DATE}) ⚠️\n\nHôm nay vẫn còn {COUNT} nhân viên chưa gửi báo cáo:\n{LIST}\n\n📢 Mọi người khẩn trương bấm nút bên dưới nộp báo cáo đúng giờ nhé! 🚀`;
+                    const template = teleConfig.unreportedMessageText || `⚠️ DANH SÁCH NHÂN VIÊN CHƯA BÁO CÁO NGÀY {DATE} ⚠️\n\nVẫn còn {COUNT} nhân viên chưa gửi báo cáo số liệu ngày {DATE}:\n{LIST}\n\n📢 Mọi người khẩn trương bấm nút bên dưới nộp báo cáo đúng giờ nhé! 🚀`;
                     const missingEmps = unreportedStatus.missingEmployees || [];
                     const dateStr = unreportedStatus.todayFormatted || new Date().toLocaleDateString('vi-VN');
 
@@ -1086,7 +1086,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                 <DollarSign className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Nạp Cược</p>
+                <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Tổng Nạp</p>
                 <h3 className="text-base font-black text-amber-400">{formatVND(displaySummary.grandTotalDeposit)}</h3>
               </div>
             </div>
@@ -1144,7 +1144,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} interval={chartData.length > 15 ? 'preserveStartEnd' : 0} />
                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={70} tickFormatter={formatAxisVND} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
@@ -1188,7 +1188,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
+                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} interval={chartData.length > 15 ? 'preserveStartEnd' : 0} />
                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }} />
                     <Area type="monotone" dataKey="firstDeposit" name="Khách mới" stroke="#34d399" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowFirst)" />
@@ -1224,7 +1224,7 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                     <th className="p-3 text-center">Đăng Ký</th>
                     <th className="p-3 text-center">Khách Mới</th>
                     <th className="p-3 text-center">Số Người Nạp</th>
-                    <th className="p-3 text-right">Nạp Cược</th>
+                    <th className="p-3 text-right">Tổng Nạp</th>
                     <th className="p-3 text-right">Tổng Cược</th>
                     <th className="p-3 text-center">Vòng Cược</th>
                     <th className="p-3 text-right">Thao Tác</th>
