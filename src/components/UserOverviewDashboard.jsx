@@ -405,10 +405,14 @@ export default function UserOverviewDashboard({ employees = [] }) {
                   <XAxis
                     dataKey="dateFormatted"
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={10}
                     tickLine={false}
                     axisLine={false}
-                    interval={chartData.length > 15 ? 'preserveStartEnd' : 0}
+                    interval={0}
+                    angle={chartData.length > 12 ? -35 : 0}
+                    textAnchor={chartData.length > 12 ? 'end' : 'middle'}
+                    height={chartData.length > 12 ? 50 : 30}
+                    minTickGap={0}
                   />
 
                   <YAxis
@@ -490,10 +494,14 @@ export default function UserOverviewDashboard({ employees = [] }) {
                   <XAxis
                     dataKey="dateFormatted"
                     stroke="#64748b"
-                    fontSize={11}
+                    fontSize={10}
                     tickLine={false}
                     axisLine={false}
-                    interval={chartData.length > 15 ? 'preserveStartEnd' : 0}
+                    interval={0}
+                    angle={chartData.length > 12 ? -35 : 0}
+                    textAnchor={chartData.length > 12 ? 'end' : 'middle'}
+                    height={chartData.length > 12 ? 50 : 30}
+                    minTickGap={0}
                   />
 
                   <YAxis

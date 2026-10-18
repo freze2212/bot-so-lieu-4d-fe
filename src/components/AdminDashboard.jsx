@@ -1144,7 +1144,18 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} interval={chartData.length > 15 ? 'preserveStartEnd' : 0} />
+                    <XAxis
+                      dataKey="dateFormatted"
+                      stroke="#64748b"
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={0}
+                      angle={chartData.length > 12 ? -35 : 0}
+                      textAnchor={chartData.length > 12 ? 'end' : 'middle'}
+                      height={chartData.length > 12 ? 50 : 30}
+                      minTickGap={0}
+                    />
                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} width={70} tickFormatter={formatAxisVND} />
                     <Tooltip
                       contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }}
@@ -1188,7 +1199,18 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" vertical={false} />
-                    <XAxis dataKey="dateFormatted" stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} interval={chartData.length > 15 ? 'preserveStartEnd' : 0} />
+                    <XAxis
+                      dataKey="dateFormatted"
+                      stroke="#64748b"
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                      interval={0}
+                      angle={chartData.length > 12 ? -35 : 0}
+                      textAnchor={chartData.length > 12 ? 'end' : 'middle'}
+                      height={chartData.length > 12 ? 50 : 30}
+                      minTickGap={0}
+                    />
                     <YAxis stroke="#64748b" fontSize={11} tickLine={false} axisLine={false} />
                     <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '12px', color: '#fff' }} />
                     <Area type="monotone" dataKey="firstDeposit" name="Khách mới" stroke="#34d399" strokeWidth={2.5} fillOpacity={1} fill="url(#adminGlowFirst)" />
