@@ -22,6 +22,9 @@ import {
   Trash2,
   Eye,
   EyeOff,
+  Pencil,
+  KeyRound,
+  Shield,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -83,9 +86,20 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
   const [loadingData, setLoadingData] = useState(false);
 
   const [showAddEmpModal, setShowAddEmpModal] = useState(false);
+  const [showEditEmpModal, setShowEditEmpModal] = useState(false);
+  const [editingEmp, setEditingEmp] = useState(null);
   const [newEmp, setNewEmp] = useState({ name: '', code: '' });
   const [empStatus, setEmpStatus] = useState({ type: '', message: '' });
   const [empLoading, setEmpLoading] = useState(false);
+
+  // Admin accounts management
+  const [adminsList, setAdminsList] = useState([]);
+  const [showAdminModal, setShowAdminModal] = useState(false);
+  const [editingAdmin, setEditingAdmin] = useState(null); // null = create
+  const [adminForm, setAdminForm] = useState({ username: '', password: '', confirmPassword: '' });
+  const [adminStatus, setAdminStatus] = useState({ type: '', message: '' });
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [loggedInUsername, setLoggedInUsername] = useState('');
 
   // Telegram Config State
   const [teleConfig, setTeleConfig] = useState({
@@ -124,6 +138,13 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
       fetchDashboardData();
       fetchTeleConfig();
       fetchUnreportedStatus();
+      fetchAdmins();
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1] || ''));
+        setLoggedInUsername(payload?.username || '');
+      } catch (e) {
+        setLoggedInUsername('');
+      }
     }
   }, [token]);
 
@@ -338,6 +359,128 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
     }
   };
 
+  const fetchAdmins = async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/admins`, {
+        headers: getAuthHeaders(token),
+      });
+      if (res.status === 401) {
+        handleLogout();
+        return;
+      }
+      if (res.ok) {
+        const data = await res.json();
+        setAdminsList(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách admin:', err);
+    }
+  };
+
+  const openCreateAdminModal = () => {
+    setEditingAdmin(null);
+    setAdminForm({ username: '', password: '', confirmPassword: '' });
+    setAdminStatus({ type: '', message: '' });
+    setShowAdminModal(true);
+  };
+
+  const openEditAdminModal = (admin) => {
+    setEditingAdmin(admin);
+    setAdminForm({ username: admin.username || '', password: '', confirmPassword: '' });
+    setAdminStatus({ type: '', message: '' });
+    setShowAdminModal(true);
+  };
+
+  const handleSaveAdmin = async (e) => {
+    e.preventDefault();
+    const username = adminForm.username.trim();
+    const password = adminForm.password.trim();
+    const confirmPassword = adminForm.confirmPassword.trim();
+
+    if (!username) {
+      setAdminStatus({ type: 'error', message: 'Vui lòng nhập tên tài khoản!' });
+      return;
+    }
+    if (!editingAdmin && !password) {
+      setAdminStatus({ type: 'error', message: 'Vui lòng nhập mật khẩu cho tài khoản mới!' });
+      return;
+    }
+    if (password && password.length < 6) {
+      setAdminStatus({ type: 'error', message: 'Mật khẩu phải có ít nhất 6 ký tự!' });
+      return;
+    }
+    if (password && password !== confirmPassword) {
+      setAdminStatus({ type: 'error', message: 'Mật khẩu nhập lại không khớp!' });
+      return;
+    }
+
+    setAdminLoading(true);
+    setAdminStatus({ type: '', message: '' });
+    try {
+      const isEdit = Boolean(editingAdmin?.id);
+      const res = await fetch(
+        isEdit ? `${API_BASE}/auth/admins/${editingAdmin.id}` : `${API_BASE}/auth/admins`,
+        {
+          method: isEdit ? 'PATCH' : 'POST',
+          headers: getAuthHeaders(token),
+          body: JSON.stringify(
+            isEdit
+              ? { username, ...(password ? { password } : {}) }
+              : { username, password },
+          ),
+        },
+      );
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleLogout();
+          throw new Error('Phiên làm việc đã hết hạn, vui lòng đăng nhập lại!');
+        }
+        throw new Error(data.message || 'Không thể lưu tài khoản');
+      }
+      setAdminStatus({ type: 'success', message: data.message || 'Đã lưu tài khoản!' });
+      fetchAdmins();
+      setTimeout(() => {
+        setShowAdminModal(false);
+        setAdminStatus({ type: '', message: '' });
+      }, 900);
+    } catch (err) {
+      setAdminStatus({ type: 'error', message: err.message });
+    } finally {
+      setAdminLoading(false);
+    }
+  };
+
+  const handleDeleteAdmin = async (admin) => {
+    if (!admin?.id) return;
+    if (adminsList.length <= 1) {
+      alert('Không thể xóa tài khoản admin cuối cùng!');
+      return;
+    }
+    if (loggedInUsername && admin.username?.toLowerCase() === loggedInUsername.toLowerCase()) {
+      if (!window.confirm('Bạn đang xóa chính tài khoản đang đăng nhập. Tiếp tục?')) return;
+    } else if (!window.confirm(`Xóa tài khoản admin "${admin.username}"?`)) {
+      return;
+    }
+    try {
+      const res = await fetch(`${API_BASE}/auth/admins/${admin.id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(token),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleLogout();
+          throw new Error('Phiên làm việc đã hết hạn, vui lòng đăng nhập lại!');
+        }
+        throw new Error(data.message || 'Không thể xóa tài khoản');
+      }
+      fetchAdmins();
+    } catch (err) {
+      alert(err.message);
+    }
+  };
+
   const handleCreateEmployee = async (e) => {
     e.preventDefault();
     if (!newEmp.name || !newEmp.code) {
@@ -371,6 +514,53 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
         setShowAddEmpModal(false);
         setEmpStatus({ type: '', message: '' });
       }, 1200);
+    } catch (err) {
+      setEmpStatus({ type: 'error', message: err.message });
+    } finally {
+      setEmpLoading(false);
+    }
+  };
+
+  const openEditEmployee = (emp) => {
+    setEditingEmp({
+      id: emp.id || emp.code,
+      name: emp.name || '',
+      code: emp.code || '',
+    });
+    setEmpStatus({ type: '', message: '' });
+    setShowEditEmpModal(true);
+  };
+
+  const handleUpdateEmployee = async (e) => {
+    e.preventDefault();
+    if (!editingEmp?.name || !editingEmp?.code) {
+      setEmpStatus({ type: 'error', message: 'Vui lòng điền đủ Tên và Mã hậu đài!' });
+      return;
+    }
+    setEmpLoading(true);
+    setEmpStatus({ type: '', message: '' });
+    try {
+      const res = await fetch(`${API_BASE}/employees/${editingEmp.id}`, {
+        method: 'PATCH',
+        headers: getAuthHeaders(token),
+        body: JSON.stringify({ name: editingEmp.name, code: editingEmp.code }),
+      });
+      const data = await parseResponseJson(res);
+      if (!res.ok) {
+        if (res.status === 401) {
+          handleLogout();
+          throw new Error('Phiên làm việc đã hết hạn, vui lòng đăng nhập lại!');
+        }
+        throw new Error(data.message || 'Không thể sửa nhân viên');
+      }
+      setEmpStatus({ type: 'success', message: `Đã cập nhật ${data.name} (${data.code})!` });
+      if (onEmployeeAdded) onEmployeeAdded();
+      fetchDashboardData();
+      setTimeout(() => {
+        setShowEditEmpModal(false);
+        setEditingEmp(null);
+        setEmpStatus({ type: '', message: '' });
+      }, 900);
     } catch (err) {
       setEmpStatus({ type: 'error', message: err.message });
     } finally {
@@ -678,8 +868,8 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
               : 'border-transparent text-slate-400 hover:text-white'
           }`}
         >
-          <Lock className="w-4 h-4" />
-          <span>Đổi Mật Khẩu Admin</span>
+          <Shield className="w-4 h-4" />
+          <span>Tài Khoản Admin ({adminsList.length || 1})</span>
         </button>
       </div>
 
@@ -1328,14 +1518,24 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                       {new Date(emp.createdAt).toLocaleDateString('vi-VN')}
                     </td>
                     <td className="p-3 text-right">
-                      <button
-                        onClick={() => handleDeleteEmployee(emp)}
-                        className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 ml-auto transition-all"
-                        title="Xóa nhân viên"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span>Xóa</span>
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openEditEmployee(emp)}
+                          className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+                          title="Sửa nhân viên"
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                          <span>Sửa</span>
+                        </button>
+                        <button
+                          onClick={() => handleDeleteEmployee(emp)}
+                          className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+                          title="Xóa nhân viên"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Xóa</span>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1393,116 +1593,195 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
         </div>
       )}
 
-      {/* CHANGE PASSWORD TAB */}
+      {/* ADMIN ACCOUNTS TAB */}
       {activeTab === 'password' && (
-        <div className="max-w-md mx-auto bg-[#0b0f19] p-6 rounded-2xl border border-slate-800/90 shadow-xl space-y-6">
-          <div>
-            <h3 className="text-xl font-bold text-white flex items-center gap-2">
-              <Lock className="w-6 h-6 text-indigo-400" />
-              <span>Đổi Mật Khẩu Admin</span>
-            </h3>
-            <p className="text-xs text-slate-400 mt-1">Cập nhật mật khẩu quản trị hệ thống</p>
+        <div className="space-y-6">
+          <div className="bg-[#0b0f19] p-6 rounded-2xl border border-slate-800/90 shadow-xl">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Shield className="w-6 h-6 text-indigo-400" />
+                  <span>Quản Lý Tài Khoản Admin</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  Thêm / sửa / xóa tài khoản đăng nhập. Đang đăng nhập: <b className="text-indigo-400">{loggedInUsername || '—'}</b>
+                </p>
+              </div>
+              <button
+                onClick={openCreateAdminModal}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm rounded-xl flex items-center gap-2 shadow-md shadow-indigo-500/20"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Thêm Tài Khoản</span>
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm text-slate-300">
+                <thead className="bg-slate-900 text-slate-400 uppercase font-bold text-xs">
+                  <tr>
+                    <th className="p-3">STT</th>
+                    <th className="p-3">Tên Tài Khoản</th>
+                    <th className="p-3">Ngày Tạo</th>
+                    <th className="p-3 text-right">Thao Tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {adminsList.map((admin, idx) => (
+                    <tr key={admin.id} className="hover:bg-slate-900/60 transition-all">
+                      <td className="p-3 font-semibold text-slate-500">{idx + 1}</td>
+                      <td className="p-3 font-bold text-white">
+                        {admin.username}
+                        {loggedInUsername && admin.username?.toLowerCase() === loggedInUsername.toLowerCase() && (
+                          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">
+                            Đang dùng
+                          </span>
+                        )}
+                      </td>
+                      <td className="p-3 text-slate-400">
+                        {admin.createdAt ? new Date(admin.createdAt).toLocaleDateString('vi-VN') : '—'}
+                      </td>
+                      <td className="p-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => openEditAdminModal(admin)}
+                            className="px-3 py-1.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 hover:text-indigo-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                            <span>Sửa</span>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteAdmin(admin)}
+                            className="px-3 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 hover:text-rose-300 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Xóa</span>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                  {adminsList.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="p-6 text-center text-slate-500">
+                        Chưa tải được danh sách tài khoản
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
 
-          {passStatus.message && (
-            <div
-              className={`p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
-                passStatus.type === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                  : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-              }`}
-            >
-              {passStatus.type === 'success' ? (
-                <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
-              ) : (
-                <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
-              )}
-              <span>{passStatus.message}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleChangePassword} className="space-y-4">
+          <div className="max-w-md bg-[#0b0f19] p-6 rounded-2xl border border-slate-800/90 shadow-xl space-y-6">
             <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Mật khẩu hiện tại</label>
-              <div className="relative">
-                <input
-                  type={showOldPass ? 'text' : 'password'}
-                  placeholder="Nhập mật khẩu hiện tại"
-                  value={passForm.oldPassword}
-                  onChange={(e) => setPassForm({ ...passForm, oldPassword: e.target.value })}
-                  className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowOldPass(!showOldPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
-                  title={showOldPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showOldPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <KeyRound className="w-5 h-5 text-indigo-400" />
+                <span>Đổi Mật Khẩu Đang Đăng Nhập</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-1">Đổi mật khẩu cho tài khoản hiện tại (cần mật khẩu cũ)</p>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Mật khẩu mới</label>
-              <div className="relative">
-                <input
-                  type={showNewPass ? 'text' : 'password'}
-                  placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
-                  value={passForm.newPassword}
-                  onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
-                  className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowNewPass(!showNewPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
-                  title={showNewPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            {passStatus.message && (
+              <div
+                className={`p-3.5 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                  passStatus.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                }`}
+              >
+                {passStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                )}
+                <span>{passStatus.message}</span>
               </div>
-            </div>
+            )}
 
-            <div>
-              <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Nhập lại mật khẩu mới</label>
-              <div className="relative">
-                <input
-                  type={showConfirmPass ? 'text' : 'password'}
-                  placeholder="Xác nhận mật khẩu mới"
-                  value={passForm.confirmPassword}
-                  onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
-                  className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPass(!showConfirmPass)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
-                  title={showConfirmPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                >
-                  {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Mật khẩu hiện tại</label>
+                <div className="relative">
+                  <input
+                    type={showOldPass ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu hiện tại"
+                    value={passForm.oldPassword}
+                    onChange={(e) => setPassForm({ ...passForm, oldPassword: e.target.value })}
+                    className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOldPass(!showOldPass)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                    title={showOldPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showOldPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <button
-              type="submit"
-              disabled={passLoading}
-              className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {passLoading ? (
-                <>
-                  <Clock className="w-4 h-4 animate-spin" />
-                  <span>Đang cập nhật...</span>
-                </>
-              ) : (
-                <>
-                  <Lock className="w-4 h-4" />
-                  <span>Cập Nhật Mật Khẩu</span>
-                </>
-              )}
-            </button>
-          </form>
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Mật khẩu mới</label>
+                <div className="relative">
+                  <input
+                    type={showNewPass ? 'text' : 'password'}
+                    placeholder="Nhập mật khẩu mới (tối thiểu 6 ký tự)"
+                    value={passForm.newPassword}
+                    onChange={(e) => setPassForm({ ...passForm, newPassword: e.target.value })}
+                    className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPass(!showNewPass)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                    title={showNewPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showNewPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Nhập lại mật khẩu mới</label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPass ? 'text' : 'password'}
+                    placeholder="Xác nhận mật khẩu mới"
+                    value={passForm.confirmPassword}
+                    onChange={(e) => setPassForm({ ...passForm, confirmPassword: e.target.value })}
+                    className="w-full px-4 py-3 pr-11 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPass(!showConfirmPass)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors p-1"
+                    title={showConfirmPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                  >
+                    {showConfirmPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={passLoading}
+                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {passLoading ? (
+                  <>
+                    <Clock className="w-4 h-4 animate-spin" />
+                    <span>Đang cập nhật...</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-4 h-4" />
+                    <span>Cập Nhật Mật Khẩu</span>
+                  </>
+                )}
+              </button>
+            </form>
+          </div>
         </div>
       )}
 
@@ -1567,6 +1846,166 @@ export default function AdminDashboard({ employees, onEmployeeAdded }) {
                   className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-500/20 transition-all"
                 >
                   {empLoading ? 'Đang tạo...' : 'Xác Nhận Tạo'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT EMPLOYEE MODAL */}
+      {showEditEmpModal && editingEmp && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-800 text-white">
+            <h3 className="text-xl font-bold text-white mb-1">Sửa Nhân Viên</h3>
+            <p className="text-xs text-slate-400 mb-4">Cập nhật tên hoặc mã hậu đài (báo cáo cũ sẽ được đồng bộ)</p>
+
+            {empStatus.message && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                  empStatus.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                }`}
+              >
+                {empStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                )}
+                <span>{empStatus.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateEmployee} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Tên Nhân Viên</label>
+                <input
+                  type="text"
+                  value={editingEmp.name}
+                  onChange={(e) => setEditingEmp({ ...editingEmp, name: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Mã Hậu Đài</label>
+                <input
+                  type="text"
+                  value={editingEmp.code}
+                  onChange={(e) => setEditingEmp({ ...editingEmp, code: e.target.value.toUpperCase() })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm uppercase font-mono font-bold"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditEmpModal(false);
+                    setEditingEmp(null);
+                    setEmpStatus({ type: '', message: '' });
+                  }}
+                  className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all border border-slate-700"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={empLoading}
+                  className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-500/20 transition-all"
+                >
+                  {empLoading ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE / EDIT ADMIN MODAL */}
+      {showAdminModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+          <div className="bg-slate-900 rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-800 text-white">
+            <h3 className="text-xl font-bold text-white mb-1">
+              {editingAdmin ? 'Sửa Tài Khoản Admin' : 'Thêm Tài Khoản Admin'}
+            </h3>
+            <p className="text-xs text-slate-400 mb-4">
+              {editingAdmin
+                ? 'Đổi tên tài khoản hoặc đặt mật khẩu mới (để trống nếu không đổi mật khẩu)'
+                : 'Tạo tài khoản đăng nhập admin mới'}
+            </p>
+
+            {adminStatus.message && (
+              <div
+                className={`mb-4 p-3 rounded-xl text-xs font-medium flex items-center gap-2 ${
+                  adminStatus.type === 'success'
+                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                    : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                }`}
+              >
+                {adminStatus.type === 'success' ? (
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0 text-emerald-400" />
+                ) : (
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 text-rose-400" />
+                )}
+                <span>{adminStatus.message}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSaveAdmin} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Tên tài khoản</label>
+                <input
+                  type="text"
+                  placeholder="Ví dụ: admin2"
+                  value={adminForm.username}
+                  onChange={(e) => setAdminForm({ ...adminForm, username: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">
+                  {editingAdmin ? 'Mật khẩu mới (tuỳ chọn)' : 'Mật khẩu'}
+                </label>
+                <input
+                  type="password"
+                  placeholder={editingAdmin ? 'Để trống nếu giữ mật khẩu cũ' : 'Tối thiểu 6 ký tự'}
+                  value={adminForm.password}
+                  onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold uppercase text-slate-300 mb-1">Nhập lại mật khẩu</label>
+                <input
+                  type="password"
+                  placeholder="Xác nhận mật khẩu"
+                  value={adminForm.confirmPassword}
+                  onChange={(e) => setAdminForm({ ...adminForm, confirmPassword: e.target.value })}
+                  className="w-full px-4 py-3 rounded-xl bg-slate-800 border border-slate-700 text-white outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAdminModal(false);
+                    setAdminStatus({ type: '', message: '' });
+                  }}
+                  className="w-1/2 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-sm transition-all border border-slate-700"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={adminLoading}
+                  className="w-1/2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow-lg shadow-indigo-500/20 transition-all"
+                >
+                  {adminLoading ? 'Đang lưu...' : editingAdmin ? 'Lưu Thay Đổi' : 'Tạo Tài Khoản'}
                 </button>
               </div>
             </form>
